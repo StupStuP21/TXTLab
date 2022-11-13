@@ -3,7 +3,11 @@
 # Press Shift+F10 to execute it or replace it with your code.
 # Press Double Shift to search everywhere for classes, files, tool windows, actions, and settings.
 
-import PyPDF2
+import stanza
+from pyvis import network as net
+from nltk.tokenize import sent_tokenize
+from tqdm import tqdm
+
 
 def print_hi(name):
     # Use a breakpoint in the code line below to debug your script.
@@ -17,50 +21,9 @@ def GetText(fileName):
     text = file.read()
     return text
 
-def GetTextFromPDF(fileName):
-    reader = PyPDF2.PdfReader(fileName)
-    numOfPages = len(reader.pages)
-    text = []
-    textText = ''
-    for i in range (0,numOfPages):
-        page = reader.pages[i]
-        text.append(page.extractText())
-    for i in range(0,len(text)):
-        textText +=text[i]
-    return textText
+def SplitTextOnSentecnces(text):
+    return sent_tokenize(text)
 
-
-def TextEndSpechSignReplacer(text): # все меняется на точку
-    text = text.replace('?','.')
-    text = text.replace('!','.')
-    return text
-
-def StraightSpeachRemover(text):
-    text = text.replace('. - ',' ')
-    text = text.replace('. "','.')
-    text = text.replace('...','.')
-    text = text.replace('..','.')
-    text = text.replace('." - ',' ')
-    text = text.replace(' - ',' ')
-    text = text.replace(' -\n',' ')
-    text = text.replace('-\n','-')
-    arrayOfReplacedSigns = ['\n','(',')','[',']','"',':',","]
-    for i in range(0,len(arrayOfReplacedSigns)):
-        text = text.replace(arrayOfReplacedSigns[i],'')
-    return text
-
-def StraightSpeachRemoverForPdf(text):
-    arrOfSignsReplacedProbels = ['. - ','." - ',' - ',' -\n',' \n \n ',' \n \n \n ']
-    arrOfSignReplasedDot = ['. "','...','..']
-    arrOfSignReplacedNoth = ['\n','(',')','[',']','"',':',","]
-    for i in text:
-        if i in arrOfSignsReplacedProbels:
-            i=' '
-        elif i in arrOfSignReplasedDot:
-            i='.'
-        elif i in arrOfSignReplacedNoth:
-            i=''
-    return text
 
 
 def TextSplittingForSentences(text):
@@ -144,8 +107,6 @@ def GetListOfWordsByStartChar(listOfWords,firstChar):
 def GetResultForTxt(fileName):
     print('Текстовый файл:')
     text = GetText(fileName)
-    text = TextEndSpechSignReplacer(text)
-    text = StraightSpeachRemover(text)
     sentences = TextSplittingForSentences(text)
     words = TextSplittingForWords(sentences)
     # print(words)
@@ -167,61 +128,62 @@ def GetResultForTxt(fileName):
     print(arrayOfStartedWithWords)
     return words
 
-def GetResultForPdf(fileName):
-    print('PDF файл:')
-    text = GetTextFromPDF(fileName)
-    text = TextEndSpechSignReplacer(text)
-    text = StraightSpeachRemover(text)
-    sentences = TextSplittingForSentences(text)
-    words = TextSplittingForWords(sentences)
-    # print(words)
-    countOfWords = GetCountOfWordsInText(words)
-    print('Кол-во слов в тексте: ', countOfWords)
-    minWord, maxWord = GetMaxAndMinWords(words)
-    print('Самое короткое слово: ', minWord)
-    print('Самое длинное слово: ', maxWord)
-    meanOfWords = GetMeanOfWord(words)
-    print('Средняя длина слов: ', meanOfWords)
-    medianOfWords = GetMeadianLenghtOfWords(words)
-    print('Мединная длина слов: ', medianOfWords)
-    meanOfSenteces = GetMeanOfLenghtSentences(words)
-    print('Средняя длина предложений: ', meanOfSenteces)
-    medianOfSentences = GetMedianLenghtOfSentences(words)
-    print('Медианная длина предложений: ', medianOfSentences)
-    firstChar = input('Введите символ начала: ')
-    arrayOfStartedWithWords = GetListOfWordsByStartChar(words, firstChar)
-    print(arrayOfStartedWithWords)
-    return words
+def fdsfsf(splittedText):
+    nlp = stanza.Pipeline(lang='ru', processors='tokenize,pos,lemma,ner,depparse')
+    triplets = []
+    for s in tqdm(splittedText):
+        doc = nlp(s)
+        for sent in doc.sentences:
+            entities = [ent.text for ent in sent.ents]
+            res_d = dict()
+            temp_d = dict()
+            for word in sent.words:
+                temp_d[word.text] = {"head": sent.words[word.head - 1].text, "dep": word.deprel, "id": word.id}
+            for k in temp_d.keys():
+                nmod_1 = ""
+                nmod_2 = ""
+                if (temp_d[k]["dep"] in ["nsubj", "nsubj:pass"]) & (k in entities):
+                    res_d[k] = {"head": temp_d[k]["head"]}
 
-def GetDifference(list1,list2):
-    words1 = []
-    words2 = []
-    for i in list1:
-        for j in i:
-            words1.append(j)
-    for j in list2:
-        for i in j:
-            words2.append(i)
-    words=[]
-    if (len(words1)>len(words2)):
-        for x in words1:
-            if x not in words2:
-                words.append(x)
-    else:
-        for x in words2:
-            if x not in words1:
-                words.append(x)
-    return words
+                    for k_0 in temp_d.keys():
+                        if (temp_d[k_0]["dep"] in ["obj", "obl"]) & \
+                                (temp_d[k_0]["head"] == res_d[k]["head"]) & \
+                                (temp_d[k_0]["id"] > temp_d[res_d[k]["head"]]["id"]):
+                            res_d[k]["obj"] = k_0
+                            break
+
+                    for k_1 in temp_d.keys():
+                        if (temp_d[k_1]["head"] == res_d[k]["head"]) & (k_1 == "не"):
+                            res_d[k]["head"] = "не " + res_d[k]["head"]
+
+                    if "obj" in res_d[k].keys():
+                        for k_4 in temp_d.keys():
+                            if (temp_d[k_4]["dep"] == "nmod") & \
+                                    (temp_d[k_4]["head"] == res_d[k]["obj"]):
+                                nmod_1 = k_4
+                                break
+
+                        for k_5 in temp_d.keys():
+                            if (temp_d[k_5]["dep"] == "nummod") & \
+                                    (temp_d[k_5]["head"] == nmod_1):
+                                nmod_2 = k_5
+                                break
+                        res_d[k]["obj"] = res_d[k]["obj"] + " " + nmod_2 + " " + nmod_1
+
+            if len(res_d) > 0:
+                triplets.append([s, res_d])
+    clear_triplets = []
+    for tr in triplets:
+        for k in tr[1].keys():
+            if "obj" in tr[1][k].keys():
+                clear_triplets.append([tr[0], k, tr[1][k]['head'], tr[1][k]['obj']])
+    return clear_triplets
+
+def buildNet(triplets):
+    n = net.Network()
 
 if __name__ == '__main__':
-    print('Первый TXT:')
-    GetResultForTxt('dostoinstwo.txt_Ascii.txt')
-    print('Первый PDF:')
-    GetResultForPdf('dostoinstwo.txt_Ascii.pdf')
-    print('Второй TXT:')
-    res1TXT = GetResultForTxt('ezhikwtumane.txt_Ascii.txt')
-    print('Второй PDF:')
-    res1PDF = GetResultForPdf('ezhikwtumane.txt_Ascii.pdf')
-    diff = GetDifference(res1TXT, res1PDF)
-    print(diff)
+    text = GetText('ezhikwtumane.txt_Ascii.txt')
+    splittedText = SplitTextOnSentecnces(text)
+    print(fdsfsf(splittedText))
     # See PyCharm help at https://www.jetbrains.com/help/pycharm/
